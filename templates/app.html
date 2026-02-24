@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <title>App</title>
+  </head>
+
+<body>
+<div class="center">
+  <form id="dataForm" method="POST">
+    <!-- CSRF Token -->
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="dataInput">Enter the code to check for code security:</label><br />
+    <textarea placeholder="Kod giriniz..." maxlength="25000" id="dataInput" name="dataInput" required></textarea>
+    <br /><br />
+    <button type="button" id="sendButton">Send to Server</button>
+  </form>
+  <br />
+  <label id="responseLabel"></label>
+</div>
+
+<script>
+  document.getElementById('sendButton').addEventListener('click', async () => {
+    const input = document.getElementById('dataInput').value;
+    const responseLabel = document.getElementById('responseLabel');
+
+    // Get the CSRF token from the hidden input
+    const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+
+    if (!input.trim()) {
+      responseLabel.textContent = "Please enter a data.";
+      return;
+    }
+
+    try {
+      const response = await fetch('/process_data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken // Add CSRF token to the request headers
+        },
+        body: JSON.stringify({ data: input })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server Error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      responseLabel.textContent = result.message;
+    } catch (error) {
+      responseLabel.textContent = `Error: ${error.message}`;
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Panel</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+</head>
+<body>
+    <div class="control-container">
+        <h2>Settings</h2>
+        <form id="uploadPathForm">
+			<input type="hidden" name="csrf_token" id="csrf_token" value = "{{ csrf_token() }}" />
+            <label for="path">Enter file paths to be checked:</label>
+            <input type="text" id="path" name="path" required>
+            <button type="submit">Add</button>
+        </form>
+
+        <div id="responseMessage" class="response-message"></div>
+
+        <h3>File Paths:</h3>
+        <button id="togglePaths">Hide/Show</button>
+        <div id="pathContainer" class="paths"></div>
+
+        <h3>File Control Results:</h3>
+        <button id="toggleProcessedFiles">Hide/Show</button>
+        <div id="processedFilesContainer" class="results"></div>
+
+        <h3>Nikto and Nmap results:</h3>
+        <button id="toggleNiktoResults">Hide/Show</button>
+        <div id="niktoResultsContainer" class="nikto-results"></div>
+        <button id="refreshNiktoBtn">Refresh Nikto and Nmap results</button>
+        <button id="fetchProcessedFilesBtn">Refresh file results</button>
+        <button id="resetProcessedPathsBtn">Re-analyse Files</button>
+    </div>
+
+    <script>
+        function fetchCSRFToken() {
+            const csrf_token = document.getElementById("csrf_token").value;
+            return csrf_token;
+        }
+
+        function fetchPaths() {
+            fetch('/get_data', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + getToken(),
+                    'X-CSRFToken': fetchCSRFToken()
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const pathContainer = document.getElementById('pathContainer');
+                pathContainer.innerHTML = '';
+        
+                data.results.forEach(path => {
+                    const pathDiv = document.createElement('div');
+                    const pathList = document.createElement('ul');
+                    
+                    const li = document.createElement('li');
+                    li.textContent = path;
+                    
+                    const removeButton = document.createElement('button');
+                    removeButton.textContent = 'Remove';
+                    removeButton.onclick = () => removePath(path);
+                    
+                    li.appendChild(removeButton);
+                    pathList.appendChild(li);
+                    pathDiv.appendChild(pathList);
+                    pathContainer.appendChild(pathDiv);
+                });
+            })
+            .catch(() => {
+                document.getElementById('responseMessage').innerText = "Error while getting paths.";
+            });
+        }
+        
+
+        function removePath(token, path) {
+            fetch('/remove_path', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + getToken(),
+                    'X-CSRFToken': fetchCSRFToken()
+                },
+                body: JSON.stringify({ token, path })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('responseMessage').innerText = data.status || data.error;
+                fetchPaths();
+                fetchProcessedFiles();
+            })
+            .catch(() => {
+                document.getElementById('responseMessage').innerText = "Error while removing path.";
+            });
+        }
+
+        function fetchProcessedFiles() {
+            fetch('/get_processed_files', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + getToken(),
+                    'X-CSRFToken': fetchCSRFToken()
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const processedFilesContainer = document.getElementById('processedFilesContainer');
+                processedFilesContainer.innerHTML = '';
+                if (data.results) {
+                    const fileList = document.createElement('ul');
+                    data.results.forEach(file => {
+                        const li = document.createElement('li');
+                        li.textContent = file;
+                        fileList.appendChild(li);
+                    });
+                    processedFilesContainer.appendChild(fileList);
+                } else {
+                    processedFilesContainer.innerText = "Could not find any processed file.";
+                }
+            })
+            .catch(() => {
+                document.getElementById('responseMessage').innerText = "Couldn't get analysed files.";
+            });
+        }
+
+        function fetchNiktoResults() {
+            fetch('/get_nikto_results', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + getToken(),
+                    'X-CSRFToken': fetchCSRFToken()
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const niktoResultsContainer = document.getElementById('niktoResultsContainer');
+                niktoResultsContainer.innerHTML = '';
+                if (data.nikto_results) {
+                    niktoResultsContainer.innerText = data.nikto_results;
+                } else {
+                    niktoResultsContainer.innerText = "Could not find Nikto results.";
+                }
+            })
+            .catch(() => {
+                document.getElementById('responseMessage').innerText = "Error while getting Nikto results.";
+            });
+        }
+
+        function resetProcessedPaths() {
+            fetch('/reset_processed_paths', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + getToken(),
+                    'X-CSRFToken': fetchCSRFToken()
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('responseMessage').innerText = data.status || data.error;
+                fetchProcessedFiles();
+            })
+            .catch(() => {
+                document.getElementById('responseMessage').innerText = "Error while resetting paths.";
+            });
+        }
+
+        function getToken() {
+            const match = document.cookie.match(/token=([^;]+)/);
+            return match ? match[1] : '';
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchPaths();
+            fetchProcessedFiles();
+            fetchNiktoResults();
+            document.getElementById('togglePaths').onclick = () => {
+                const x = document.getElementById('pathContainer');
+                x.style.display = x.style.display === "none" ? "block" : "none";
+            };
+            document.getElementById('toggleProcessedFiles').onclick = () => {
+                const x = document.getElementById('processedFilesContainer');
+                x.style.display = x.style.display === "none" ? "block" : "none";
+            };
+            document.getElementById('toggleNiktoResults').onclick = () => {
+                const x = document.getElementById('niktoResultsContainer');
+                x.style.display = x.style.display === "none" ? "block" : "none";
+            };
+            document.getElementById('refreshNiktoBtn').onclick = fetchNiktoResults;
+            document.getElementById('fetchProcessedFilesBtn').onclick = fetchProcessedFiles;
+            document.getElementById('resetProcessedPathsBtn').onclick = resetProcessedPaths;
+        });
+
+        document.getElementById('uploadPathForm').addEventListener('submit', event => {
+            event.preventDefault();
+            const path = document.getElementById('path').value;
+            fetch('/set_upload_path', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + getToken(),
+                    'X-CSRFToken': fetchCSRFToken()
+                },
+                body: JSON.stringify({ path })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('responseMessage').innerText = data.status || data.error;
+                fetchPaths();
+                fetchProcessedFiles();
+            })
+            .catch(() => {
+                document.getElementById('responseMessage').innerText = "Error while adding path.";
+            });
+        });
+    </script>
+</body>
+</html>

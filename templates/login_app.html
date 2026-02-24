@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <title>Giriş Yap</title>
+    <script>
+        // Make sure to pass the CSRF token in the headers with each request
+        async function handleLogin(event) {
+            event.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            // Get the CSRF token from the page
+            const csrfToken = document.getElementById('csrf_token').value;
+
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken // Add CSRF token in the header
+                },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                localStorage.setItem('token', data.token);
+                window.location.href = '/app'; // Redirect to control panel
+            } else {
+                alert('Invalid credentials');
+            }
+        }
+    </script>
+</head>
+<body>
+
+<div class="topnav">
+    <a href="/">Index</a>
+    <a class="active" href="/login">Control Panel</a>
+    <a href="/login_app">App</a>
+</div>
+
+<div class="login-container">
+    <h2>Login</h2>
+    <form onsubmit="handleLogin(event)">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required>
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required>
+        <!-- CSRF token hidden field -->
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <button type="submit">Login</button>
+    </form>
+</div>
+
+</body>
+</html>
